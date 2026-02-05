@@ -23,6 +23,7 @@ type SessionActionContext = {
   updateFooter: () => void;
   updateAutocompleteProvider: () => void;
   setActivityStatus: (text: string) => void;
+  getAgentDisplayName?: (agentId: string) => string;
 };
 
 export function createSessionActions(context: SessionActionContext) {
@@ -40,6 +41,7 @@ export function createSessionActions(context: SessionActionContext) {
     updateFooter,
     updateAutocompleteProvider,
     setActivityStatus,
+    getAgentDisplayName,
   } = context;
   let refreshSessionInfoPromise: Promise<void> | null = null;
 
@@ -190,7 +192,8 @@ export function createSessionActions(context: SessionActionContext) {
             includeThinking: state.showThinking,
           });
           if (text) {
-            chatLog.finalizeAssistant(text);
+            const agentName = getAgentDisplayName?.(state.currentAgentId);
+            chatLog.finalizeAssistant(text, undefined, agentName);
           }
           continue;
         }

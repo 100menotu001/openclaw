@@ -113,7 +113,7 @@ export function createEventHandlers(context: EventHandlerContext) {
       if (!displayText) {
         return;
       }
-      chatLog.updateAssistant(displayText, evt.runId);
+      chatLog.updateAssistant(displayText, evt.runId, getAgentNameFromSession(evt.sessionKey));
       setActivityStatus("streaming");
     }
     if (evt.state === "final") {

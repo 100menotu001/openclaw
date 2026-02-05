@@ -731,10 +731,11 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
       const resolvedPrefix = resolveResponsePrefixTemplate(messagesConfig.responsePrefix, {
         identityName,
       });
-      // Only prepend if message doesn't already start with the prefix (trim to handle whitespace)
-      const trimmedPrefix = resolvedPrefix?.trim();
-      if (trimmedPrefix && !message.trim().startsWith(trimmedPrefix)) {
-        message = `${trimmedPrefix} ${message}`;
+      // Normalize prefix whitespace before comparison to prevent duplicates
+      // e.g., "[Aria]" vs "[Aria] " would otherwise yield "[Aria] [Aria] hello"
+      const normalizedPrefix = resolvedPrefix?.trim();
+      if (normalizedPrefix && !message.trimStart().startsWith(normalizedPrefix)) {
+        message = `${normalizedPrefix} ${message.trimStart()}`;
       }
     }
   }

@@ -508,6 +508,18 @@ export async function runTui(opts: TuiOptions) {
     return parsed ? normalizeAgentId(parsed.agentId) : null;
   })();
 
+  const getAgentDisplayName = (agentId: string): string => {
+    const name = agentNames.get(agentId);
+    if (name) {
+      return name;
+    }
+    // Fallback mapping for common agent ids
+    if (agentId === "main") {
+      return "Aria";
+    }
+    return agentId.charAt(0).toUpperCase() + agentId.slice(1);
+  };
+
   const sessionActions = createSessionActions({
     client,
     chatLog,
@@ -522,21 +534,10 @@ export async function runTui(opts: TuiOptions) {
     updateFooter,
     updateAutocompleteProvider,
     setActivityStatus,
+    getAgentDisplayName,
   });
   const { refreshAgents, refreshSessionInfo, loadHistory, setSession, abortActive } =
     sessionActions;
-
-  const getAgentDisplayName = (agentId: string): string => {
-    const name = agentNames.get(agentId);
-    if (name) {
-      return name;
-    }
-    // Fallback mapping for common agent ids
-    if (agentId === "main") {
-      return "Aria";
-    }
-    return agentId.charAt(0).toUpperCase() + agentId.slice(1);
-  };
 
   const { handleChatEvent, handleAgentEvent } = createEventHandlers({
     chatLog,

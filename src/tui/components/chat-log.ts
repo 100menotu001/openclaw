@@ -35,11 +35,11 @@ export class ChatLog extends Container {
     return component;
   }
 
-  updateAssistant(text: string, runId?: string) {
+  updateAssistant(text: string, runId?: string, agentName?: string) {
     const effectiveRunId = this.resolveRunId(runId);
     const existing = this.streamingRuns.get(effectiveRunId);
     if (!existing) {
-      this.startAssistant(text, runId);
+      this.startAssistant(text, runId, agentName);
       return;
     }
     existing.setText(text);
