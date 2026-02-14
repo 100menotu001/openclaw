@@ -15,6 +15,7 @@ Docs: https://docs.openclaw.ai
 - Cron: delete one-shot jobs after success by default; add `--keep-after-run` for CLI.
 - Cron: suppress messaging tools during announce delivery so summaries post consistently.
 - Cron: avoid duplicate deliveries when isolated runs send messages directly.
+- Hooks: add bundled compliance logging hook with webhook, file, CLI, and telemetry destinations. (#8855) Thanks @100menotu001.
 
 ### Fixes
 

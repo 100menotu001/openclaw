@@ -3,6 +3,13 @@
  *
  * Provides utilities for executing plugin lifecycle hooks with proper
  * error handling, priority ordering, and async support.
+ *
+ * NOTE: Compliance logging (agent_start, agent_end, etc.) is handled by the
+ * optional compliance hook plugin, not hardcoded here. Enable it via config:
+ *
+ *   hooks.internal.entries.compliance.enabled = true
+ *
+ * See: src/hooks/bundled/compliance/HOOK.md
  */
 
 import type { PluginRegistry } from "./registry.js";

@@ -1,6 +1,7 @@
 import type { TUI } from "@mariozechner/pi-tui";
 import type { ChatLog } from "./components/chat-log.js";
 import type { AgentEvent, ChatEvent, TuiStateAccess } from "./tui-types.js";
+import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { asString, extractTextFromMessage, isCommandMessage } from "./tui-formatters.js";
 import { TuiStreamAssembler } from "./tui-stream-assembler.js";
 
@@ -10,10 +11,24 @@ type EventHandlerContext = {
   state: TuiStateAccess;
   setActivityStatus: (text: string) => void;
   refreshSessionInfo?: () => Promise<void>;
+  loadHistory?: () => Promise<void>;
+  isLocalRunId?: (runId: string) => boolean;
+  forgetLocalRunId?: (runId: string) => void;
+  clearLocalRunIds?: () => void;
 };
 
 export function createEventHandlers(context: EventHandlerContext) {
-  const { chatLog, tui, state, setActivityStatus, refreshSessionInfo } = context;
+  const {
+    chatLog,
+    tui,
+    state,
+    setActivityStatus,
+    refreshSessionInfo,
+    loadHistory,
+    isLocalRunId,
+    forgetLocalRunId,
+    clearLocalRunIds,
+  } = context;
   const finalizedRuns = new Map<string, number>();
   const sessionRuns = new Map<string, number>();
   let streamAssembler = new TuiStreamAssembler();
@@ -50,6 +65,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     finalizedRuns.clear();
     sessionRuns.clear();
     streamAssembler = new TuiStreamAssembler();
+    clearLocalRunIds?.();
   };
 
   const noteSessionRun = (runId: string) => {
@@ -95,6 +111,11 @@ export function createEventHandlers(context: EventHandlerContext) {
     }
     if (evt.state === "final") {
       if (isCommandMessage(evt.message)) {
+        if (isLocalRunId?.(evt.runId)) {
+          forgetLocalRunId?.(evt.runId);
+        } else {
+          void loadHistory?.();
+        }
         const text = extractTextFromMessage(evt.message);
         if (text) {
           chatLog.addSystem(text);
@@ -107,6 +128,11 @@ export function createEventHandlers(context: EventHandlerContext) {
         tui.requestRender();
         return;
       }
+      if (isLocalRunId?.(evt.runId)) {
+        forgetLocalRunId?.(evt.runId);
+      } else {
+        void loadHistory?.();
+      }
       const stopReason =
         evt.message && typeof evt.message === "object" && !Array.isArray(evt.message)
           ? typeof (evt.message as Record<string, unknown>).stopReason === "string"
@@ -115,7 +141,10 @@ export function createEventHandlers(context: EventHandlerContext) {
           : "";
 
       const finalText = streamAssembler.finalize(evt.runId, evt.message, state.showThinking);
-      chatLog.finalizeAssistant(finalText, evt.runId);
+      // Filter out NO_REPLY silent responses from display
+      if (!isSilentReplyText(finalText, SILENT_REPLY_TOKEN)) {
+        chatLog.finalizeAssistant(finalText, evt.runId);
+      }
       noteFinalizedRun(evt.runId);
       state.activeChatRunId = null;
       setActivityStatus(stopReason === "error" ? "error" : "idle");
@@ -129,6 +158,11 @@ export function createEventHandlers(context: EventHandlerContext) {
       state.activeChatRunId = null;
       setActivityStatus("aborted");
       void refreshSessionInfo?.();
+      if (isLocalRunId?.(evt.runId)) {
+        forgetLocalRunId?.(evt.runId);
+      } else {
+        void loadHistory?.();
+      }
     }
     if (evt.state === "error") {
       chatLog.addSystem(`run error: ${evt.errorMessage ?? "unknown"}`);
@@ -137,6 +171,11 @@ export function createEventHandlers(context: EventHandlerContext) {
       state.activeChatRunId = null;
       setActivityStatus("error");
       void refreshSessionInfo?.();
+      if (isLocalRunId?.(evt.runId)) {
+        forgetLocalRunId?.(evt.runId);
+      } else {
+        void loadHistory?.();
+      }
     }
     tui.requestRender();
   };
@@ -148,12 +187,20 @@ export function createEventHandlers(context: EventHandlerContext) {
     const evt = payload as AgentEvent;
     syncSessionKey();
     // Agent events (tool streaming, lifecycle) are emitted per-run. Filter against the
-    // active chat run id, not the session id.
+    // active chat run id, not the session id. Tool results can arrive after the chat
+    // final event, so accept finalized runs for tool updates.
     const isActiveRun = evt.runId === state.activeChatRunId;
-    if (!isActiveRun && !sessionRuns.has(evt.runId)) {
+    const isKnownRun = isActiveRun || sessionRuns.has(evt.runId) || finalizedRuns.has(evt.runId);
+    if (!isKnownRun) {
       return;
     }
     if (evt.stream === "tool") {
+      const verbose = state.sessionInfo.verboseLevel ?? "off";
+      const allowToolEvents = verbose !== "off";
+      const allowToolOutput = verbose === "full";
+      if (!allowToolEvents) {
+        return;
+      }
       const data = evt.data ?? {};
       const phase = asString(data.phase, "");
       const toolCallId = asString(data.toolCallId, "");
@@ -164,13 +211,20 @@ export function createEventHandlers(context: EventHandlerContext) {
       if (phase === "start") {
         chatLog.startTool(toolCallId, toolName, data.args);
       } else if (phase === "update") {
+        if (!allowToolOutput) {
+          return;
+        }
         chatLog.updateToolResult(toolCallId, data.partialResult, {
           partial: true,
         });
       } else if (phase === "result") {
-        chatLog.updateToolResult(toolCallId, data.result, {
-          isError: Boolean(data.isError),
-        });
+        if (allowToolOutput) {
+          chatLog.updateToolResult(toolCallId, data.result, {
+            isError: Boolean(data.isError),
+          });
+        } else {
+          chatLog.updateToolResult(toolCallId, { content: [] }, { isError: Boolean(data.isError) });
+        }
       }
       tui.requestRender();
       return;

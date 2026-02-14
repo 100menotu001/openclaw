@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import type { AnyAgentTool } from "./common.js";
 import { loadConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
+import { logDmSent } from "../../hooks/bundled/compliance/handler.js";
 import {
   isSubagentSessionKey,
   normalizeAgentId,
@@ -289,6 +290,16 @@ export function createSessionsSendTool(opts?: {
           if (typeof response?.runId === "string" && response.runId) {
             runId = response.runId;
           }
+          // Log cross-agent DM to compliance system (skip same-agent sends)
+          if (isCrossAgent) {
+            logDmSent(
+              cfg,
+              requesterAgentId || "main",
+              targetAgentId || "main",
+              message,
+              requesterInternalKey,
+            );
+          }
           startA2AFlow(undefined, runId);
           return jsonResult({
             runId,
@@ -299,6 +310,18 @@ export function createSessionsSendTool(opts?: {
         } catch (err) {
           const messageText =
             err instanceof Error ? err.message : typeof err === "string" ? err : "error";
+          // Log failed cross-agent DM to compliance system
+          if (isCrossAgent) {
+            logDmSent(
+              cfg,
+              requesterAgentId || "main",
+              targetAgentId || "main",
+              message,
+              requesterInternalKey,
+              "error",
+              messageText,
+            );
+          }
           return jsonResult({
             runId,
             status: "error",
@@ -317,9 +340,31 @@ export function createSessionsSendTool(opts?: {
         if (typeof response?.runId === "string" && response.runId) {
           runId = response.runId;
         }
+        // Log cross-agent DM to compliance system (skip same-agent sends)
+        if (isCrossAgent) {
+          logDmSent(
+            cfg,
+            requesterAgentId || "main",
+            targetAgentId || "main",
+            message,
+            requesterInternalKey,
+          );
+        }
       } catch (err) {
         const messageText =
           err instanceof Error ? err.message : typeof err === "string" ? err : "error";
+        // Log failed cross-agent DM to compliance system
+        if (isCrossAgent) {
+          logDmSent(
+            cfg,
+            requesterAgentId || "main",
+            targetAgentId || "main",
+            message,
+            requesterInternalKey,
+            "error",
+            messageText,
+          );
+        }
         return jsonResult({
           runId,
           status: "error",

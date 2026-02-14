@@ -5,6 +5,7 @@ import type { AnyAgentTool } from "./common.js";
 import { formatThinkingLevels, normalizeThinkLevel } from "../../auto-reply/thinking.js";
 import { loadConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
+import { logSpawnStart } from "../../hooks/bundled/compliance/handler.js";
 import {
   isSubagentSessionKey,
   normalizeAgentId,
@@ -231,6 +232,10 @@ export function createSessionsSpawnTool(opts?: {
             message: task,
             sessionKey: childSessionKey,
             channel: requesterOrigin?.channel,
+            to: requesterOrigin?.to ?? undefined,
+            accountId: requesterOrigin?.accountId ?? undefined,
+            threadId:
+              requesterOrigin?.threadId != null ? String(requesterOrigin.threadId) : undefined,
             idempotencyKey: childIdem,
             deliver: false,
             lane: AGENT_LANE_SUBAGENT,
@@ -258,6 +263,15 @@ export function createSessionsSpawnTool(opts?: {
           runId: childRunId,
         });
       }
+
+      // Log spawn to compliance system (if enabled)
+      logSpawnStart(
+        cfg,
+        requesterAgentId || "main",
+        task,
+        childSessionKey,
+        targetAgentId !== requesterAgentId ? targetAgentId : undefined,
+      );
 
       registerSubagentRun({
         runId: childRunId,
