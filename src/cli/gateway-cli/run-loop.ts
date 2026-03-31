@@ -1,6 +1,7 @@
 // In-process gateway run loop, restart signaling, drain, and update respawn handling.
 import { randomUUID } from "node:crypto";
 import net from "node:net";
+import { markActiveSubagentSessionsAbortedForRestart } from "../../agents/subagent-registry.js";
 import { clearRuntimeConfigSnapshot } from "../../config/runtime-snapshot.js";
 import {
   captureGatewayRestartTraceHandoff,
@@ -537,6 +538,16 @@ export async function runGatewayLoop(params: {
               // Reject new enqueues immediately during the drain window so
               // sessions get an explicit restart error instead of silent task loss.
               await markRestartDraining();
+              // Persist restart recovery state for active subagent sessions so
+              // interrupted child runs are marked aborted and can recover on the
+              // next lifecycle, mirroring the main-session restart recovery path.
+              try {
+                await markActiveSubagentSessionsAbortedForRestart();
+              } catch (err) {
+                gatewayLog.warn(
+                  `failed to mark active subagent sessions aborted for restart: ${String(err)}`,
+                );
+              }
               const activeTasks = getActiveTaskCount();
               const activeRuns = getActiveEmbeddedRunCount();
               activeTasksAtDrainStart = activeTasks;
