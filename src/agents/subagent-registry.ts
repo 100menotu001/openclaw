@@ -6,6 +6,7 @@ import {
   loadSessionStore,
   resolveAgentIdFromSessionKey,
   resolveStorePath,
+  updateSessionStore,
   type SessionEntry,
 } from "../config/sessions.js";
 import { ensureContextEnginesInitialized } from "../context-engine/init.js";
@@ -1495,4 +1496,52 @@ export function listDescendantRunsForRequester(rootSessionKey: string): Subagent
 
 export function initSubagentRegistry() {
   restoreSubagentRunsOnce();
+}
+
+export async function markActiveSubagentSessionsAbortedForRestart(): Promise<number> {
+  const cfg = loadConfig();
+  const sessionsByStore = new Map<string, Set<string>>();
+
+  for (const entry of subagentRuns.values()) {
+    if (typeof entry.endedAt === "number" && entry.endedAt > 0) {
+      continue;
+    }
+    const childSessionKey = entry.childSessionKey?.trim();
+    if (!childSessionKey) {
+      continue;
+    }
+    const agentId = resolveAgentIdFromSessionKey(childSessionKey);
+    const storePath = resolveStorePath(cfg.session?.store, { agentId });
+    const storeSessions = sessionsByStore.get(storePath) ?? new Set<string>();
+    storeSessions.add(childSessionKey);
+    sessionsByStore.set(storePath, storeSessions);
+  }
+
+  let updated = 0;
+  for (const [storePath, sessionKeys] of sessionsByStore.entries()) {
+    try {
+      await updateSessionStore(storePath, (store) => {
+        const now = Date.now();
+        for (const sessionKey of sessionKeys) {
+          const current = store[sessionKey];
+          if (!current || current.abortedLastRun) {
+            continue;
+          }
+          current.abortedLastRun = true;
+          current.updatedAt = now;
+          store[sessionKey] = current;
+          updated += 1;
+        }
+      });
+    } catch (err) {
+      log.warn(
+        `failed to mark active subagent sessions aborted for restart in ${storePath}: ${String(err)}`,
+      );
+    }
+  }
+
+  if (updated > 0) {
+    log.info(`marked ${updated} active subagent session(s) aborted for restart`);
+  }
+  return updated;
 }
