@@ -490,26 +490,31 @@ async function appendMemoryFlushContent(params: {
   sandbox?: MemoryFlushAppendOnlyWriteOptions["sandbox"];
   signal?: AbortSignal;
 }) {
-  if (!params.sandbox) {
-    await appendFileWithinRoot({
-      rootDir: params.root,
-      relativePath: params.relativePath,
-      data: params.content,
-      mkdir: true,
-      prependNewlineIfNeeded: true,
-    });
-    return;
-  }
-
   const existing = await readOptionalUtf8File({
     absolutePath: params.absolutePath,
     relativePath: params.relativePath,
     sandbox: params.sandbox,
     signal: params.signal,
   });
+  const delta = params.content.startsWith(existing)
+    ? params.content.slice(existing.length)
+    : params.content;
+  if (delta === "") return;
+
+  if (!params.sandbox) {
+    await appendFileWithinRoot({
+      rootDir: params.root,
+      relativePath: params.relativePath,
+      data: delta,
+      mkdir: true,
+      prependNewlineIfNeeded: true,
+    });
+    return;
+  }
+
   const separator =
-    existing.length > 0 && !existing.endsWith("\n") && !params.content.startsWith("\n") ? "\n" : "";
-  const next = `${existing}${separator}${params.content}`;
+    existing.length > 0 && !existing.endsWith("\n") && !delta.startsWith("\n") ? "\n" : "";
+  const next = `${existing}${separator}${delta}`;
   if (params.sandbox) {
     const parent = path.posix.dirname(params.relativePath);
     if (parent && parent !== ".") {

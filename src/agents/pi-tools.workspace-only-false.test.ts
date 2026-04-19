@@ -238,4 +238,23 @@ describe("FS tools with workspaceOnly=false", () => {
     });
     await expect(fs.readFile(allowedAbsolutePath, "utf-8")).resolves.toBe("seed\nnew note");
   });
+
+  it("skips the existing-prefix overlap when a flush payload re-sends the full file", async () => {
+    const allowedRelativePath = "memory/2026-03-08.md";
+    const allowedAbsolutePath = path.join(workspaceDir, allowedRelativePath);
+    await fs.mkdir(path.dirname(allowedAbsolutePath), { recursive: true });
+    const existing = "# 2026-03-08 Durable Notes\n\n- first\n- second\n";
+    await fs.writeFile(allowedAbsolutePath, existing);
+
+    const writeTool = wrapToolMemoryFlushAppendOnlyWrite(
+      createHostWorkspaceWriteTool(workspaceDir),
+      { root: workspaceDir, relativePath: allowedRelativePath },
+    );
+
+    await writeTool.execute("test-call-memory-dedupe", {
+      path: allowedRelativePath,
+      content: `${existing}- third\n`,
+    });
+    await expect(fs.readFile(allowedAbsolutePath, "utf-8")).resolves.toBe(`${existing}- third\n`);
+  });
 });
