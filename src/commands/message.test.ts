@@ -314,6 +314,7 @@ describe("messageCommand", () => {
           channelId: "general",
         },
       } as { ok: boolean } & Record<string, unknown>,
+      } as { ok: boolean } & Record<string, unknown>,
       dryRun: false,
     });
 
