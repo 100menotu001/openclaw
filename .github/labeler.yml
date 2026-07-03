@@ -41,6 +41,12 @@
       - any-glob-to-any-file:
           - "extensions/google-meet/**"
           - "docs/plugins/google-meet.md"
+"plugin: reflect":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/reflect/**"
+          - "docs/plugins/reflect.md"
+          - "docs/plugins/reference/reflect.md"
 "plugin: workboard":
   - changed-files:
       - any-glob-to-any-file:

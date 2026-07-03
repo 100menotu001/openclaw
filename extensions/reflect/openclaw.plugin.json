@@ -1,0 +1,114 @@
+{
+  "id": "reflect",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true,
+    "onCommands": ["reflect"]
+  },
+  "name": "Reflect",
+  "description": "Background reflection pass that mines completed turns for memory-linked insights. Phase 0 runs in shadow mode: insights are scored and banked for /reflect digest review, never delivered.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "agents": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "scanModel": { "type": "string" },
+      "synthesisModel": { "type": "string" },
+      "preGate": { "type": "boolean" },
+      "triage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "surfaceThreshold": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "deferThreshold": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      },
+      "convergence": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxIterations": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "stallIterations": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "loopTokenBudget": { "type": "integer", "minimum": 1000, "maximum": 200000 },
+          "timeoutSeconds": { "type": "integer", "minimum": 5, "maximum": 600 }
+        }
+      },
+      "dailyTokenBudget": { "type": "integer", "minimum": 1000, "maximum": 5000000 },
+      "store": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxEntries": { "type": "integer", "minimum": 10, "maximum": 2000 },
+          "ttlDays": { "type": "integer", "minimum": 1, "maximum": 365 },
+          "dedupeSimilarity": { "type": "number", "minimum": 0.5, "maximum": 1 }
+        }
+      },
+      "logging": { "type": "boolean" }
+    }
+  },
+  "uiHints": {
+    "agents": {
+      "label": "Target Agents",
+      "help": "Explicit agent ids that may run reflection. Empty means every agent."
+    },
+    "scanModel": {
+      "label": "Scan Model",
+      "help": "Provider/model used for candidate discovery, e.g. anthropic/claude-haiku-4-5. Requires plugins.entries.reflect.llm.allowModelOverride: true; allowedModels optionally restricts the permitted targets. Defaults to the agent's configured model."
+    },
+    "synthesisModel": {
+      "label": "Synthesis Model",
+      "help": "Provider/model used to draft the would-be follow-up for surface-tier insights. Defaults to the scan model."
+    },
+    "preGate": {
+      "label": "Pre-Gate",
+      "help": "Skip reflection for short or command-like transactional turns. Default on."
+    },
+    "triage.surfaceThreshold": {
+      "label": "Surface Threshold",
+      "help": "Minimum 0-100 score for the surface tier. In shadow mode surface-tier insights are banked with a drafted follow-up, never delivered. Default 85."
+    },
+    "triage.deferThreshold": {
+      "label": "Defer Threshold",
+      "help": "Minimum 0-100 score to bank an insight in the deferred store. Candidates below this are discarded. Default 60."
+    },
+    "convergence.maxIterations": {
+      "label": "Max Iterations",
+      "help": "Hard ceiling on retrieval/scan loop iterations per turn. Default 3."
+    },
+    "convergence.stallIterations": {
+      "label": "Stall Iterations",
+      "help": "Stop after this many consecutive iterations without new bankable candidates. Default 2."
+    },
+    "convergence.loopTokenBudget": {
+      "label": "Loop Token Budget",
+      "help": "Per-turn model token ceiling for the reflection loop. Default 15000."
+    },
+    "convergence.timeoutSeconds": {
+      "label": "Timeout (seconds)",
+      "help": "Wall-clock ceiling for one reflection pass. Default 120."
+    },
+    "dailyTokenBudget": {
+      "label": "Daily Token Budget",
+      "help": "Hard daily cap across all reflection passes; the pass is skipped when exhausted. Default 50000."
+    },
+    "store.maxEntries": {
+      "label": "Store Max Entries",
+      "help": "Maximum banked insight records; oldest are evicted beyond this. Default 400."
+    },
+    "store.ttlDays": {
+      "label": "Insight TTL (days)",
+      "help": "Banked insights expire after this many days. Default 90."
+    },
+    "store.dedupeSimilarity": {
+      "label": "Dedupe Similarity",
+      "help": "0.5-1 token-overlap similarity above which a new insight merges into an existing record. Default 0.9."
+    },
+    "logging": {
+      "label": "Verbose Logging",
+      "help": "Emit per-pass timing and outcome logs."
+    }
+  }
+}
